@@ -10,8 +10,8 @@ Before running the main code, you must generate the mp solution.
 
 Go to the `mp_sub_problem/` folder and run the following file in Python:
 
-```julia
-include("generate_mp_solution.ipynb")
+```python
+generate_mp_solution.ipynb
 ```
 
 This will generate the mp subproblem solution required for the main code.
@@ -23,7 +23,7 @@ After generating the mp solution, go to the `main_code/` folder.
 Run the main file:
 
 ```julia
-include("main_code.jl")
+main_code.jl
 ```
 
 **Note:**  
@@ -34,12 +34,12 @@ We have provided this in the file `PlasmoAlgorithm.jl.zip`.
 
 - To **plot the critical regions**, run:
 
-```julia
-include("visual_CR.jl")
+```python
+visual_CR.ipynb
 ```
 
 - To **plot the runtime**, run:
 
-```julia
-include("time_plot.jl")
+```python
+time_plot.ipynb
 ```
