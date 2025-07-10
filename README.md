@@ -26,7 +26,7 @@ After generating the mp solution, the code in the `main_code/` folder can be run
 The environment can be activated by starting the Julia REPL, typing `]` (to enter the Package manager) and typing
 
 ```
-pkg> activate ./main_code/env
+pkg> activate ./env
 ```
 
 The environment can then be activated by typing 
