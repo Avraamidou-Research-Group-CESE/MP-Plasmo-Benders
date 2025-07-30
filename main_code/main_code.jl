@@ -468,45 +468,83 @@ for t in time_list
     scens_vals = scens_list
     df_out = DataFrame(scens = scens_vals)
 
+    # This will hold all the bounds/gaps DataFrames for the current time step
+    all_bounds_dfs = DataFrame[]
+
     # For each method and solver combination
     for method in ["MP", "Plasmo"], (i, solver) in enumerate(sub_solver_list)
         solver_name = solver_names[i]
         col_solve = Symbol("$(method)_$(solver_name)_solve")
         col_total = Symbol("$(method)_$(solver_name)_total")
 
-        # Initialize columns with NaN
+        # Initialize columns with NaN for the main results DataFrame
         df_out[!, col_solve] = fill(NaN, length(scens_vals))
         df_out[!, col_total] = fill(NaN, length(scens_vals))
 
         for (j, scens) in enumerate(scens_vals)
             try
                 # Run the appropriate method
+                local total, ba # Ensure variables are scoped correctly for the try/catch block
                 if method == "MP"
-                    total, ba = run_MP(t, solver; relax=false, scens=scens, multicut=true)
+                    total, ba = run_MP(t, solver; relax=false, scens=scens, multicut=false)
                 else
-                    total, ba = run_Plasmo(t, solver; relax=false, scens=scens, multicut=true)
+                    total, ba = run_Plasmo(t, solver; relax=false, scens=scens, multicut=false)
                 end
 
                 # Safely extract solve time
                 solve_time = ba.ext["timer_optimize"][1] - ba.ext["timer_master"][1]
 
-                # Store results
+                # Calculate bounds and gaps
+                lower_bounds = ba.lower_bounds
+                feasible_solutions = ba.upper_bounds #this is the feasible solution returned at any given iteration and so is not monotonic
+                upper_bounds = [minimum(ba.upper_bounds[1:i]) for i in 1:length(ba.upper_bounds)] #this returns the monotonic upper bounds
+                all_gaps = abs.(upper_bounds .- lower_bounds) ./ upper_bounds
+                
+                # Store primary results
                 df_out[j, col_solve] = float(solve_time)
                 df_out[j, col_total] = float(total)
 
+                # --- NEW: Create and store the detailed bounds DataFrame ---
+                num_iterations = length(lower_bounds)
+                df_bounds_temp = DataFrame(
+                    scens = fill(scens, num_iterations),
+                    method = fill(method, num_iterations),
+                    solver = fill(solver_name, num_iterations),
+                    iteration = 1:num_iterations,
+                    lower_bound = lower_bounds,
+                    upper_bound = upper_bounds,
+                    gap = all_gaps
+                )
+                push!(all_bounds_dfs, df_bounds_temp)
+
             catch e
                 @warn "Error at t=$t, scens=$scens, solver=$solver_name, method=$method: $e"
+                # Ensure failed runs are marked as NaN in the main results
                 df_out[j, col_solve] = NaN
                 df_out[j, col_total] = NaN
             end
         end
     end
 
-    # Save after finishing current time step
-    CSV.write("timing_results_time$(t).csv", df_out)
+    # --- Save all results for the current time step ---
+
+    # 1. Save the main timing results CSV
+    timing_filename = "timing_results_time$(t).csv"
+    CSV.write(timing_filename, df_out)
+    println("--- Saved main results to $timing_filename ---")
+
+    # 2. Combine and save the detailed bounds and gaps CSV
+    if !isempty(all_bounds_dfs)
+        final_bounds_df = vcat(all_bounds_dfs...)
+        bounds_filename = "bounds_and_gaps_time$(t).csv"
+        CSV.write(bounds_filename, final_bounds_df)
+        println("--- Saved detailed bounds and gaps to $bounds_filename ---")
+    else
+        println("--- No bounds data was generated to save for time = $t ---")
+    end
+
     println("=== Finished time = $t ===")
 end
-
 # scens_list = [10, 50, 100, 200, 500]
 # time_list = [5, 10, 25, 50]
 
